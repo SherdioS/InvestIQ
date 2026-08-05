@@ -5,6 +5,7 @@
 # Git
 .git
 .gitignore
+.github/
 
 # Python Cache
 __pycache__/
@@ -13,6 +14,7 @@ __pycache__/
 # Virtual Environment
 .venv/
 venv/
+.investiq/
 
 # IDE
 .vscode/
@@ -20,3 +22,7 @@ venv/
 
 # Documentation
 *.md
+
+# DevOps
+k8s/
+deployments/

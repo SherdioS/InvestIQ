@@ -15,7 +15,7 @@ from routes.chat import router as chat_router
 load_dotenv()
 
 app = FastAPI(
-    title="AI-Powered Investor Intelligence Platform"
+    title="InvestIQ: AI-Powered Investor Intelligence Platform"
 )
 
 
@@ -24,9 +24,12 @@ def startup_event():
     """
     Initialize database and vector index on app startup.
     """
-    create_database()
-    create_tables()
-    
+    try:
+        create_database()
+        create_tables()
+    except Exception as e:
+        print(f"Warning: Could not create database or tables: {e}")
+
     try:
         create_index(
             endpoint=os.getenv("AZURE_SEARCH_ENDPOINT"),

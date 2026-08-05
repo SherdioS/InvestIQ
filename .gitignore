@@ -6,6 +6,7 @@ __pycache__/
 *.pyd
 *.python-version
 .venv/
+.investiq/
 venv/
 ENV/
 env/
