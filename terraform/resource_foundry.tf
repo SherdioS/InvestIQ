@@ -1,5 +1,5 @@
 resource "azurerm_cognitive_account" "az_foundry" {
-    depends_on = [azurerm_resource_group.rg, random_id.suffix]
+    depends_on          = [azurerm_resource_group.rg, random_id.suffix]
     name                = "${var.project_prefix}-foundry-${var.environment}-${random_id.suffix.hex}"
     location            = var.location
     resource_group_name = azurerm_resource_group.rg.name
