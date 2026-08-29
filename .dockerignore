@@ -6,6 +6,7 @@
 .git
 .gitignore
 .github/
+.pre-commit-config.yaml
 
 # Python Cache
 __pycache__/
@@ -25,4 +26,4 @@ venv/
 
 # DevOps
 k8s/
-deployments/
+terraform/
