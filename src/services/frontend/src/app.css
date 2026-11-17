@@ -1,0 +1,68 @@
+@import "../static/style.css";
+
+.uploader-card:focus-visible,
+.chat-panel-toggle:focus-visible,
+.chat-send-btn:focus-visible,
+.company-select:focus-visible,
+.chat-context-select:focus-visible,
+.chat-text-input:focus-visible {
+  outline: 2px solid var(--accent-blue);
+  outline-offset: 3px;
+}
+
+.uploader-card[aria-disabled="true"] {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.progress-container.visible {
+  display: block;
+}
+
+.progress-status-error {
+  color: var(--accent-red);
+}
+
+.empty-state {
+  padding: 28px 32px;
+}
+
+.empty-state > svg {
+  display: block;
+  width: 52px;
+  height: 52px;
+  margin: 0 auto 16px;
+  fill: none;
+  stroke: var(--text-muted);
+  stroke-width: 1.5;
+}
+
+.app-status {
+  color: var(--text-secondary);
+  padding: 18px 22px;
+}
+
+.metrics-load-warning {
+  align-items: center;
+  color: var(--text-secondary);
+  display: flex;
+  font-size: 12px;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 16px;
+}
+
+.metrics-load-warning button {
+  background: none;
+  border: 0;
+  color: var(--accent-blue);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+}
+
+.chat-text-input:disabled,
+.chat-send-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}

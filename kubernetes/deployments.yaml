@@ -1,0 +1,143 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app
+  namespace: investiq
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: app
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: app
+    spec:
+      containers:
+        - name: app
+          image: sherwinrf/investiq-frontend:init
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: app-config
+            - secretRef:
+                name: app-secret
+          # readinessProbe:
+          #   httpGet:
+          #     path: /health
+          #     port: http
+          # livenessProbe:
+          #   httpGet:
+          #     path: /health
+          #     port: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chat
+  namespace: investiq
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: chat
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: chat
+    spec:
+      containers:
+        - name: chat
+          image: sherwinrf/investiq-chat:init
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: app-config
+            - secretRef:
+                name: app-secret
+          # readinessProbe:
+          #   tcpSocket:
+          #     port: http
+          # livenessProbe:
+          #   tcpSocket:
+          #     port: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dashboard
+  namespace: investiq
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: dashboard
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: dashboard
+    spec:
+      containers:
+        - name: dashboard
+          image: sherwinrf/investiq-dashboard:init
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: app-config
+            - secretRef:
+                name: app-secret
+          # readinessProbe:
+          #   tcpSocket:
+          #     port: http
+          # livenessProbe:
+          #   tcpSocket:
+          #     port: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ingestion
+  namespace: investiq
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ingestion
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ingestion
+    spec:
+      containers:
+        - name: ingestion
+          image: sherwinrf/investiq-ingestion:init
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: app-config
+            - secretRef:
+                name: app-secret
+          # readinessProbe:
+          #   httpGet:
+          #     path: /api/health
+          #     port: http
+          # livenessProbe:
+          #   httpGet:
+          #     path: /api/health
+          #     port: http

@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: investiq
+data:
+  CHAT_SERVICE_URL: "http://chat:8000"
+  DASHBOARD_SERVICE_URL: "http://dashboard:8000"
+  INGESTION_SERVICE_URL: "http://ingestion:8000"
+
+  AZURE_OPENAI_ENDPOINT: "https://eastus.api.cognitive.microsoft.com/"
+  AZURE_OPENAI_CHAT_ENDPOINT: "https://eastus.api.cognitive.microsoft.com/"
+  # AZURE_OPENAI_API_KEY: ""
+  AZURE_OPENAI_API_EMBEDDING_VERSION: "2023-05-15"
+  AZURE_OPENAI_API_VERSION: "2024-12-01-preview"
+
+  AZURE_SEARCH_ENDPOINT: ""
+  # AZURE_SEARCH_API_KEY: ""
+  AZURE_SEARCH_INDEX_NAME: "financial-documents"
+  AZURE_OPENAI_EMBEDDING_DEPLOYMENT: "text-embedding-deployment"
+  AZURE_OPENAI_CHAT_DEPLOYMENT: "gpt-5-deployment"
+
+  POSTGRES_HOST: ""
+  POSTGRES_PORT: "5432"
+  POSTGRES_DATABASE: "financial_intelligence"
+  # POSTGRES_USER: ""
+  # POSTGRES_PASSWORD: ""

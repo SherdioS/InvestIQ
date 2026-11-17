@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "investiq-llm"
+version = "0.1.0"
+description = "LLM integration utilities for the InvestIQ Platform."
+requires-python = ">=3.12"
+dependencies = [
+    "openai==2.41.0",
+    "pydantic==2.11.7",
+    "python-dotenv==1.1.1",
+]
+
+[tool.setuptools]
+packages = ["llm"]
+package-dir = { llm = "." }

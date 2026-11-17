@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "investiq-vectorstore"
+version = "0.1.0"
+description = "Azure AI Search vector store utilities for the InvestIQ Platform."
+requires-python = ">=3.12"
+dependencies = [
+    "azure-core==1.35.1",
+    "azure-search-documents==11.5.3",
+    "python-dotenv==1.1.1",
+]
+
+[tool.setuptools]
+packages = ["vectorstore"]
+package-dir = { vectorstore = "." }

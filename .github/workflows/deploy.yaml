@@ -3,16 +3,145 @@ name: Build and Deploy to AKS
 on:
   push:
     branches:
+      # - dev
       - main
 
 jobs:
-
-  build-and-deploy:
-
+  docker-build:
     runs-on: ubuntu-latest
+    environment: ${{ github.ref_name == 'main' && 'prod' || 'dev' }}
+    outputs:
+      image_name: ${{ steps.meta.outputs.image_name }}
+      image_tag: ${{ steps.meta.outputs.image_tag }}
+      env_name: ${{ steps.meta.outputs.env_name }}
 
     steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      # - name: Install Python dependencies
+      #   run: |
+      #     python -m pip install --upgrade pip
+      #     pip install -r requirements.txt
+
+      # - name: Run tests (optional)
+      #   run: |
+      #     pytest -q || echo "No tests configured yet"
+
+      - name: SonarCloud Scan
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        shell: bash
+        run: |
+          export SONAR_SCANNER_VERSION=8.0.1.6346
+          export SONAR_SCANNER_HOME="$HOME/.sonar/sonar-scanner-$SONAR_SCANNER_VERSION-linux-x64"
+          mkdir -p "$HOME/.sonar"
+          curl --create-dirs -sSLo "$HOME/.sonar/sonar-scanner.zip" "https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-$SONAR_SCANNER_VERSION-linux-x64.zip"
+          unzip -o "$HOME/.sonar/sonar-scanner.zip" -d "$HOME/.sonar/"
+          export PATH="$SONAR_SCANNER_HOME/bin:$PATH"
+          sonar-scanner \
+            -Dsonar.host.url=https://sonarcloud.io \
+            -Dsonar.organization=sherdios-projects \
+            -Dsonar.projectKey=sherdios-projects_investiq \
+            -Dsonar.token="$SONAR_TOKEN"
+
+      - name: Set Docker image metadata
+        id: meta
+        shell: bash
+        run: |
+          SHORT_SHA="${GITHUB_SHA::7}"
+
+          if [ "${GITHUB_REF_NAME}" = "dev" ]; then
+            ENV_NAME="dev"
+            BRANCH_TAG="dev"
+            IMAGE_TAG="dev-${SHORT_SHA}"
+          elif [ "${GITHUB_REF_NAME}" = "main" ]; then
+            ENV_NAME="prod"
+            BRANCH_TAG="prod"
+            IMAGE_TAG="prod-${SHORT_SHA}"
+          else
+            echo "Unsupported branch: ${GITHUB_REF_NAME}"
+            exit 1
+          fi
+
+          IMAGE_NAME="${{ vars.DOCKERHUB_USERNAME }}/investiq"
+
+          echo "env_name=${ENV_NAME}" >> "$GITHUB_OUTPUT"
+          echo "branch_tag=${BRANCH_TAG}" >> "$GITHUB_OUTPUT"
+          echo "image_tag=${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
+          echo "image_name=${IMAGE_NAME}" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build Docker Image
+        env:
+          IMAGE_NAME: ${{ steps.meta.outputs.image_name }}
+          IMAGE_TAG: ${{ steps.meta.outputs.image_tag }}
+          ENV_NAME: ${{ steps.meta.outputs.env_name }}
+          BRANCH_TAG: ${{ steps.meta.outputs.branch_tag }}
+        run: |
+          docker build --pull --no-cache \
+            -t "${IMAGE_NAME}:${IMAGE_TAG}" \
+            -t "${IMAGE_NAME}:${ENV_NAME}" \
+            -t "${IMAGE_NAME}:${BRANCH_TAG}" \
+            .
+
+      - name: Smoke test Docker container
+        env:
+          IMAGE_NAME: ${{ steps.meta.outputs.image_name }}
+          IMAGE_TAG: ${{ steps.meta.outputs.image_tag }}
+        run: |
+          docker run -d --name investiq-smoke -p 8000:8000 "${IMAGE_NAME}:${IMAGE_TAG}"
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:8000/health > /tmp/investiq-health.json; then
+              echo "Health check passed"
+              cat /tmp/investiq-health.json
+              break
+            fi
+            if [ "$i" -eq 30 ]; then
+              echo "Application did not become healthy in time"
+              docker logs investiq-smoke
+              exit 1
+            fi
+            sleep 2
+          done
+          docker rm -f investiq-smoke >/dev/null 2>&1 || true
+
+      - name: Run Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${{ steps.meta.outputs.image_name }}:${{ steps.meta.outputs.image_tag }}
+          format: table
+          exit-code: '1'
+          ignore-unfixed: true
+          severity: 'CRITICAL,HIGH'
+
+      - name: Push Docker Image
+        env:
+          IMAGE_NAME: ${{ steps.meta.outputs.image_name }}
+          IMAGE_TAG: ${{ steps.meta.outputs.image_tag }}
+          ENV_NAME: ${{ steps.meta.outputs.env_name }}
+          BRANCH_TAG: ${{ steps.meta.outputs.branch_tag }}
+        run: |
+          docker push "${IMAGE_NAME}:${IMAGE_TAG}"
+          docker push "${IMAGE_NAME}:${ENV_NAME}"
+          docker push "${IMAGE_NAME}:${BRANCH_TAG}"
+
+  deploy-to-aks:
+    needs: docker-build
+    runs-on: ubuntu-latest
+    environment: ${{ github.ref_name == 'main' && 'prod' || 'dev' }}
+
+    steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
@@ -21,33 +150,22 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Login to ACR
+      - name: Ensure AKS cluster exists
+        shell: bash
         run: |
-          az acr login --name ${{ secrets.ACR_NAME }}
-
-      - name: Docker Login to ACR
-        run: |
-          docker login ${{ secrets.ACR_LOGIN_SERVER }} \
-            -u ${{ secrets.ACR_USERNAME }} \
-            -p ${{ secrets.ACR_PASSWORD }}
-
-      - name: Build Docker Image
-        run: |
-          docker build \
-            -t ${{ secrets.ACR_LOGIN_SERVER }}/invint:latest .
-
-      - name: Push Docker Image
-        run: |
-          docker push \
-            ${{ secrets.ACR_LOGIN_SERVER }}/invint:latest
+          az aks show \
+            --resource-group "${{ vars.AKS_RESOURCE_GROUP }}" \
+            --name "${{ vars.AKS_CLUSTER_NAME }}" \
+            --query "name" \
+            -o tsv
 
       - name: Get AKS Credentials
         run: |
           az aks get-credentials \
-            --resource-group ${{ secrets.AKS_RESOURCE_GROUP }} \
-            --name ${{ secrets.AKS_CLUSTER_NAME }} \
+            --resource-group "${{ vars.AKS_RESOURCE_GROUP }}" \
+            --name "${{ vars.AKS_CLUSTER_NAME }}" \
             --overwrite-existing
-            
+
       - name: Create Kubernetes Secrets
         run: |
           kubectl create secret generic invint-secrets \
@@ -69,15 +187,14 @@ jobs:
             --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Deploy Application
+        env:
+          IMAGE_NAME: ${{ needs.docker-build.outputs.image_name }}
+          IMAGE_TAG: ${{ needs.docker-build.outputs.image_tag }}
         run: |
           kubectl apply -f k8s/deployment.yaml
           kubectl apply -f k8s/service.yaml
-
-      - name: Restart Deployment
-        run: |
-          kubectl rollout restart deployment/invint
+          kubectl set image deployment/invint invint="${IMAGE_NAME}:${IMAGE_TAG}" --record
 
       - name: Verify Rollout
         run: |
           kubectl rollout status deployment/invint
-

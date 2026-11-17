@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "investiq-rag"
+version = "0.1.0"
+description = "Retrieval-augmented generation utilities for the InvestIQ Platform."
+requires-python = ">=3.12"
+dependencies = [
+    "investiq-llm==0.1.0",
+    "investiq-vectorstore==0.1.0",
+    "pydantic==2.11.7",
+    "python-dotenv==1.1.1",
+]
+
+[tool.setuptools]
+packages = ["rag"]
+package-dir = { rag = "." }

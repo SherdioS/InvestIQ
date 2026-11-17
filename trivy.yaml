@@ -1,0 +1,10 @@
+misconfiguration:
+  scanners:
+    - terraform
+
+  terraform:
+    exclude-downloaded-modules: true
+
+scan:
+  skip-dirs:
+    - .terraform

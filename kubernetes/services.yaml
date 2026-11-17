@@ -1,0 +1,59 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: app
+  namespace: investiq
+spec:
+  type: LoadBalancer
+  selector:
+    app.kubernetes.io/name: app
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: chat
+  namespace: investiq
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: chat
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http
+      protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dashboard
+  namespace: investiq
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: dashboard
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http
+      protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ingestion
+  namespace: investiq
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: ingestion
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http
+      protocol: TCP

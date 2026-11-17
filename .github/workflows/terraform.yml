@@ -1,0 +1,223 @@
+name: Terraform CI/CD - Azure Dev
+
+on:
+  # pull_request:
+  #   branches:
+  #     - dev
+  #   paths:
+  #     - "terraform/**"
+
+  push:
+    branches:
+      - dev
+    paths:
+      - "terraform/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: terraform-dev-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  TF_WORKING_DIR: terraform
+  TF_IN_AUTOMATION: true
+  TF_INPUT: false
+
+jobs:
+
+  # -------------------------------------------------------
+  # Terraform formatting
+  # -------------------------------------------------------
+  fmt:
+    name: Terraform Format
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v4.0.1
+
+      - name: Check Terraform formatting
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform fmt -check -recursive -diff
+
+
+  # -------------------------------------------------------
+  # Terraform validation
+  # -------------------------------------------------------
+  validate:
+    name: Terraform Validate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v4.0.1
+
+      - name: Terraform Init
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform init -backend=false -input=false
+
+      - name: Terraform Validate
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform validate
+
+
+  # -------------------------------------------------------
+  # Terraform linting
+  # -------------------------------------------------------
+  lint:
+    name: TFLint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v4.0.1
+
+      - name: Setup TFLint
+        uses: terraform-linters/setup-tflint@v6
+
+      - name: Initialize TFLint
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: tflint --init
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Run TFLint
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: tflint --format compact
+
+
+  # -------------------------------------------------------
+  # Security / IaC misconfiguration scanning
+  # -------------------------------------------------------
+  security:
+    name: Terraform Security Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run Trivy IaC scan
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: config
+          scan-ref: terraform
+          severity: HIGH,CRITICAL
+          exit-code: 1
+          format: table
+
+      - name: Scan repository for secrets
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: terraform
+          scanners: secret
+          severity: HIGH,CRITICAL
+          exit-code: 1
+          format: table
+
+
+  # -------------------------------------------------------
+  # Terraform native tests
+  # -------------------------------------------------------
+  test:
+    name: Terraform Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v4.0.1
+
+      - name: Terraform Init
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform init -backend=false -input=false
+
+      - name: Terraform Test
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform test
+
+
+  # -------------------------------------------------------
+  # Trigger HCP Terraform
+  # Only runs on push to dev.
+  # -------------------------------------------------------
+  terraform-cloud:
+    name: HCP Terraform Plan & Apply
+    runs-on: ubuntu-latest
+
+    needs:
+      - fmt
+      - validate
+      - lint
+      - security
+      - test
+
+    # Never apply from a pull request.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+
+    permissions:
+      contents: read
+
+    # env:
+    #   TF_CLOUD_ORGANIZATION: Sherdios-Projects
+    #   TF_WORKSPACE: Dev
+    #   TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
+
+    # environment:
+    #   name: azure-dev
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Upload Terraform configuration
+        id: upload
+        uses: hashicorp/tfc-workflows-github/actions/upload-configuration@v1.3.2
+        with:
+          workspace: ${{ vars.TF_WORKSPACE }}
+          directory: ${{ env.TF_WORKING_DIR }}
+
+      - name: Create Terraform Cloud run
+        id: run
+        uses: hashicorp/tfc-workflows-github/actions/create-run@v1.3.2
+        with:
+          workspace: ${{ vars.TF_WORKSPACE }}
+          configuration_version: ${{ steps.upload.outputs.configuration_version_id }}
+          message: >
+            GitHub Actions deployment
+            - Repository: ${{ github.repository }}
+            - Commit: ${{ github.sha }}
+
+      - name: Apply Terraform Cloud run
+        uses: hashicorp/tfc-workflows-github/actions/apply-run@v1.3.2
+        if: fromJSON(steps.run.outputs.payload).data.attributes.actions.IsConfirmable
+        with:
+          run: ${{ steps.run.outputs.run_id }}
+          comment: >
+            Approved by GitHub Actions CI for commit ${{ github.sha }}
+
+      - name: Terraform Cloud summary
+        run: |
+          echo "Terraform Cloud run triggered."
+          echo "Workspace: ${{ vars.TF_WORKSPACE }}"
+          echo "Commit: ${{ github.sha }}"
+
+      # - name: Fetch Terraform outputs
+      #   uses: hashicorp/tfc-workflows-github/actions/workspace-output@v1.1.1
+      #   id: tf-output
+      #   with:
+      #     workspace: ${{ secrets.TF_WORKSPACE }}

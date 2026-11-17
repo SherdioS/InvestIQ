@@ -60,3 +60,8 @@ credentials.json
 terraform/.terraform/
 terraform/terraform.tfstate.backup
 terraform/.terraform.lock.hcl
+
+# Others
+TODO*.txt
+legacy/
+data/
